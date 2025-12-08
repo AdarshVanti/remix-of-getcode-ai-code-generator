@@ -17,7 +17,8 @@ interface TerminalProps {
 
 export default function LiveTerminal({ generatedCode }: TerminalProps) {
   const [code, setCode] = useState("");
-  const [output, setOutput] = useState("// Click 'Run' to execute code...");
+  const [output, setOutput] = useState("// Output will appear here...");
+  const [stdin, setStdin] = useState(""); // <--- NEW: State for User Input
   const [language, setLanguage] = useState("python");
   const [isRunning, setIsRunning] = useState(false);
 
@@ -51,6 +52,7 @@ export default function LiveTerminal({ generatedCode }: TerminalProps) {
           language: runtime.language,
           version: runtime.version,
           files: [{ content: code }],
+          stdin: stdin // <--- NEW: Sending the input to the server
         }),
       });
 
@@ -113,10 +115,12 @@ export default function LiveTerminal({ generatedCode }: TerminalProps) {
         </div>
       </div>
 
+      {/* Code Editor Area */}
       <textarea 
         value={code} 
         onChange={(e) => setCode(e.target.value)}
         spellCheck={false}
+        placeholder="Source code goes here..."
         style={{
           width: '100%',
           height: '150px',
@@ -130,6 +134,30 @@ export default function LiveTerminal({ generatedCode }: TerminalProps) {
         }}
       />
 
+      {/* NEW: Input Box for User Inputs (stdin) */}
+      <div style={{ marginBottom: '10px' }}>
+        <label style={{ display: 'block', fontSize: '0.8em', color: '#8b949e', marginBottom: '5px' }}>
+           Program Input (Type numbers here before running):
+        </label>
+        <textarea 
+          value={stdin}
+          onChange={(e) => setStdin(e.target.value)}
+          placeholder="e.g. 10&#10;20"
+          style={{
+            width: '100%',
+            height: '50px',
+            background: '#161b22',
+            color: '#e6edf3',
+            border: '1px solid #30363d',
+            padding: '10px',
+            borderRadius: '4px',
+            fontFamily: 'monospace',
+            resize: 'vertical'
+          }}
+        />
+      </div>
+
+      {/* Output Display */}
       <div style={{
         background: '#010409',
         padding: '15px',
