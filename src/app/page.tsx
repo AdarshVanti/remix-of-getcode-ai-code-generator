@@ -1,5 +1,5 @@
 "use client";
-
+import LiveTerminal from '@/components/LiveTerminal';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -159,29 +159,35 @@ export default function Home() {
           )}
         </div>
 
-        {/* Code Output */}
+        {/* Code Output Section */}
         {generatedCode && (
-          <div className="bg-white rounded-2xl shadow-xl shadow-blue-100/50 p-8 animate-fade-in-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Generated Code
-              </h3>
-              <Button
-                onClick={copyCode}
-                variant="outline"
-                size="sm"
-                className="rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all"
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                {copied ? 'Copied!' : 'Copy Code'}
-              </Button>
+          <>
+            {/* 1. The Code Display Block */}
+            <div className="bg-white rounded-2xl shadow-xl shadow-blue-100/50 p-8 animate-fade-in-up mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Generated Code
+                </h3>
+                <Button
+                  onClick={copyCode}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all"
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  {copied ? 'Copied!' : 'Copy Code'}
+                </Button>
+              </div>
+              <div className="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                <pre className="text-sm text-gray-100 font-mono leading-relaxed">
+                  <code>{generatedCode}</code>
+                </pre>
+              </div>
             </div>
-            <div className="bg-gray-900 rounded-xl p-6 overflow-x-auto">
-              <pre className="text-sm text-gray-100 font-mono leading-relaxed">
-                <code>{generatedCode}</code>
-              </pre>
-            </div>
-          </div>
+
+            {/* 2. The Live Terminal Block (Only shows if code exists) */}
+            <LiveTerminal generatedCode={generatedCode} />
+          </>
         )}
 
         {/* Footer */}
@@ -191,4 +197,4 @@ export default function Home() {
       </div>
     </div>
   );
-}
+          }
