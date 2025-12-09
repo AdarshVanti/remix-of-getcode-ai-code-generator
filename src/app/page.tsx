@@ -13,7 +13,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   
-  // Simple Mode Switch State
+  // Simple Mode State
   const [simpleMode, setSimpleMode] = useState(true);
 
   const generateCode = async () => {
@@ -194,7 +194,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* This is the line that fixes the sync issue! */}
             <LiveTerminal generatedCode={generatedCode} languageProp={language} />
           </>
         )}
@@ -205,4 +204,4 @@ export default function Home() {
       </div>
     </div>
   );
-}
+      }
