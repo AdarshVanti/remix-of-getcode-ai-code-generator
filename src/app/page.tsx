@@ -3,7 +3,7 @@ import LiveTerminal from '@/components/LiveTerminal';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Copy, Loader2, Sparkles, Zap } from 'lucide-react';
+import { Copy, Loader2, Zap, Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [prompt, setPrompt] = useState('');
@@ -13,7 +13,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   
-  // 1. NEW: State for Simple Mode (Default is ON for easy testing)
+  // Simple Mode Switch State
   const [simpleMode, setSimpleMode] = useState(true);
 
   const generateCode = async () => {
@@ -36,7 +36,7 @@ export default function Home() {
         body: JSON.stringify({
           prompt: prompt.trim(),
           language,
-          simpleMode, // 2. NEW: Sending the switch status to backend
+          simpleMode,
         }),
       });
 
@@ -75,7 +75,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-12 animate-fade-in">
           <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 mb-3 tracking-tight">
             GetCode
@@ -85,9 +84,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-xl shadow-blue-100/50 p-8 sm:p-10 mb-8 animate-fade-in-up">
-          {/* Prompt Input */}
           <div className="mb-6">
             <label htmlFor="prompt" className="block text-sm font-semibold text-gray-700 mb-3">
               Enter your prompt
@@ -104,10 +101,7 @@ export default function Home() {
             />
           </div>
 
-          {/* Language & Mode Selection Row */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            
-            {/* Language Buttons */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Select Language
@@ -130,7 +124,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 3. NEW: Simple Mode Toggle Switch */}
+            {/* Simple Mode Toggle */}
             <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
                 <label className="flex items-center cursor-pointer gap-3">
                     <div className="relative">
@@ -154,7 +148,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Generate Button */}
           <Button
             onClick={generateCode}
             disabled={isLoading}
@@ -170,7 +163,6 @@ export default function Home() {
             )}
           </Button>
 
-          {/* Error Message */}
           {error && (
             <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl animate-fade-in">
               <p className="text-red-700 text-sm font-medium">{error}</p>
@@ -178,10 +170,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* Code Output Section */}
         {generatedCode && (
           <>
-            {/* Code Display Block */}
             <div className="bg-white rounded-2xl shadow-xl shadow-blue-100/50 p-8 animate-fade-in-up mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -204,12 +194,11 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 4. NEW: Passing languageProp to the terminal */}
+            {/* This is the line that fixes the sync issue! */}
             <LiveTerminal generatedCode={generatedCode} languageProp={language} />
           </>
         )}
 
-        {/* Footer */}
         <footer className="text-center mt-12 text-gray-600 text-sm animate-fade-in">
           © Adarsh, Danappa & Mazin Ali
         </footer>
