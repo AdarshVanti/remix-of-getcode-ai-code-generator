@@ -3,7 +3,7 @@ import LiveTerminal from '@/components/LiveTerminal';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Copy, Loader2 } from 'lucide-react';
+import { Copy, Loader2, Sparkles, Zap } from 'lucide-react';
 
 export default function Home() {
   const [prompt, setPrompt] = useState('');
@@ -12,17 +12,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  
+  // 1. NEW: State for Simple Mode (Default is ON for easy testing)
+  const [simpleMode, setSimpleMode] = useState(true);
 
-  /**
-   * Main function to generate code
-   * Calls the backend API with prompt and language
-   */
   const generateCode = async () => {
-    // Clear previous state
     setError('');
     setGeneratedCode('');
 
-    // Validate input
     if (!prompt.trim()) {
       setError('Please enter a prompt');
       return;
@@ -39,6 +36,7 @@ export default function Home() {
         body: JSON.stringify({
           prompt: prompt.trim(),
           language,
+          simpleMode, // 2. NEW: Sending the switch status to backend
         }),
       });
 
@@ -58,9 +56,6 @@ export default function Home() {
     }
   };
 
-  /**
-   * Copy generated code to clipboard
-   */
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(generatedCode);
@@ -71,9 +66,6 @@ export default function Home() {
     }
   };
 
-  /**
-   * Handle Enter key press in input
-   */
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading) {
       generateCode();
@@ -112,26 +104,53 @@ export default function Home() {
             />
           </div>
 
-          {/* Language Selection */}
-          <div className="mb-8">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Select Language
-            </label>
-            <div className="flex gap-3 flex-wrap">
-              {['C', 'Java', 'Python'].map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => setLanguage(lang)}
-                  disabled={isLoading}
-                  className={`px-6 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-                    language === lang
-                      ? 'bg-blue-500 text-white shadow-md shadow-blue-200 scale-105'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-102'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {lang}
-                </button>
-              ))}
+          {/* Language & Mode Selection Row */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            
+            {/* Language Buttons */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Select Language
+              </label>
+              <div className="flex gap-3 flex-wrap">
+                {['C', 'Java', 'Python'].map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setLanguage(lang)}
+                    disabled={isLoading}
+                    className={`px-6 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                      language === lang
+                        ? 'bg-blue-500 text-white shadow-md shadow-blue-200 scale-105'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-102'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. NEW: Simple Mode Toggle Switch */}
+            <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                <label className="flex items-center cursor-pointer gap-3">
+                    <div className="relative">
+                        <input 
+                            type="checkbox" 
+                            className="sr-only" 
+                            checked={simpleMode}
+                            onChange={() => setSimpleMode(!simpleMode)}
+                        />
+                        <div className={`block w-14 h-8 rounded-full transition-colors duration-300 ${simpleMode ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        <div className={`absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ${simpleMode ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </div>
+                    <div className="text-sm font-medium text-gray-700">
+                        {simpleMode ? (
+                            <span className="flex items-center text-green-700"><Zap className="w-4 h-4 mr-1"/> Simple Mode</span>
+                        ) : (
+                            <span className="flex items-center text-gray-600"><Sparkles className="w-4 h-4 mr-1"/> Complex Mode</span>
+                        )}
+                    </div>
+                </label>
             </div>
           </div>
 
@@ -162,7 +181,7 @@ export default function Home() {
         {/* Code Output Section */}
         {generatedCode && (
           <>
-            {/* 1. The Code Display Block */}
+            {/* Code Display Block */}
             <div className="bg-white rounded-2xl shadow-xl shadow-blue-100/50 p-8 animate-fade-in-up mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -185,8 +204,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 2. The Live Terminal Block (Only shows if code exists) */}
-            <LiveTerminal generatedCode={generatedCode} />
+            {/* 4. NEW: Passing languageProp to the terminal */}
+            <LiveTerminal generatedCode={generatedCode} languageProp={language} />
           </>
         )}
 
@@ -197,4 +216,4 @@ export default function Home() {
       </div>
     </div>
   );
-          }
+}
