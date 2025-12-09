@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * POST /api/generate
- * Generates code based on prompt and selected language
- * Provider-agnostic architecture - easy to swap AI providers
+ * Generates code based on prompt, language, and complexity mode
  */
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, language } = await request.json();
+    const { prompt, language, simpleMode } = await request.json();
 
     // Validate input
     if (!prompt || !prompt.trim()) {
@@ -26,7 +25,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get API key from environment
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Note: Ensure your Vercel env variable matches this name exactly
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
       return NextResponse.json(
@@ -35,42 +35,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize AI client (currently Gemini, easily swappable)
-    const client = new GoogleGenAI({ apiKey });
+    // Initialize AI client
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Construct the AI prompt
-    const aiPrompt = `Generate ${language} code for the following request. 
-Return ONLY the code without any explanations, markdown formatting, or code block markers.
-Do not include \`\`\` or language tags.
-
-Request: ${prompt}
-
-Language: ${language}`;
-
-    // Generate code using new SDK
-    const response = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: aiPrompt,
-            },
-          ],
-        },
-      ],
-    });
-
-    // Extract generated code from response
-    const textContent = response.candidates?.[0]?.content?.parts?.find(
-      (part: any) => part.text
-    );
+    // --- LOGIC FOR SIMPLE VS COMPLEX MODE ---
+    let instruction = "";
     
-    let generatedCode = textContent?.text || '';
+    if (simpleMode) {
+      // STRICT instructions for the "Fake Terminal"
+      instruction = `
+      CRITICAL INSTRUCTIONS FOR SIMPLE MODE:
+      1. Write a SIMPLE, LINEAR program.
+      2. DO NOT use 'while True' loops, infinite menus, or "Try again" prompts.
+      3. DO NOT ask "Do you want to continue?".
+      4. If the program needs input, ask for it ONCE at the start, do the logic, and EXIT immediately.
+      5. Output ONLY the raw code. No markdown formatting.
+      `;
+    } else {
+      // Normal instructions for advanced users
+      instruction = `
+      Write a professional and robust program.
+      You MAY use loops, menus, and functions if appropriate for the task.
+      Output ONLY the raw code. No markdown formatting.
+      `;
+    }
+
+    const aiPrompt = `Generate ${language} code for the following request: "${prompt}".
+    
+    ${instruction}
+    
+    Language: ${language}`;
+
+    // Generate code
+    const result = await model.generateContent(aiPrompt);
+    const response = await result.response;
+    let generatedCode = response.text();
 
     // Clean up response - remove markdown code blocks if present
-    generatedCode = generatedCode.replace(/```[\w]*\n?/g, '').trim();
+    generatedCode = generatedCode.replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim();
 
     return NextResponse.json({
       code: generatedCode,
