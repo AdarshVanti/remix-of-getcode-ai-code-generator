@@ -25,25 +25,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Get API key from environment
-    // Note: Ensure your Vercel env variable matches this name exactly
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'API configuration error' },
+        { error: 'API configuration error: Key not found' },
         { status: 500 }
       );
     }
 
     // Initialize AI client
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    // UPDATED: Using "gemini-pro" because it is the most stable version
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     // --- LOGIC FOR SIMPLE VS COMPLEX MODE ---
     let instruction = "";
     
     if (simpleMode) {
-      // STRICT instructions for the "Fake Terminal"
       instruction = `
       CRITICAL INSTRUCTIONS FOR SIMPLE MODE:
       1. Write a SIMPLE, LINEAR program.
@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
       5. Output ONLY the raw code. No markdown formatting.
       `;
     } else {
-      // Normal instructions for advanced users
       instruction = `
       Write a professional and robust program.
       You MAY use loops, menus, and functions if appropriate for the task.
@@ -80,10 +79,12 @@ export async function POST(request: NextRequest) {
       language: language.toLowerCase(),
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Code generation error:', error);
+    
+    // Send the specific error message back so we can see it in the browser if it fails
     return NextResponse.json(
-      { error: 'Failed to generate code. Please try again.' },
+      { error: `Failed to generate code: ${error.message}` },
       { status: 500 }
     );
   }
