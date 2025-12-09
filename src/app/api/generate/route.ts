@@ -4,53 +4,41 @@ export async function POST(request: NextRequest) {
   try {
     const { prompt, language, simpleMode } = await request.json();
 
-    if (!prompt || !prompt.trim()) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
-    }
-
+    // 🔒 SAFE DEBUGGING: Check if Vercel sees the key
     const apiKey = process.env.GROQ_API_KEY;
+    
+    console.log("--- DEBUG START ---");
     if (!apiKey) {
-      return NextResponse.json({ error: 'Server Error: Groq API Key Missing' }, { status: 500 });
-    }
-
-    // 1. Prepare Instructions based on "Simple Mode"
-    let systemInstruction = "";
-    if (simpleMode) {
-      systemInstruction = `
-      CRITICAL INSTRUCTIONS:
-      1. Write a SIMPLE, LINEAR program.
-      2. NO loops, NO functions, NO menus, NO "try again".
-      3. Ask for all inputs ONCE at the start.
-      4. Output ONLY the raw code. Do NOT use markdown backticks (e.g. \`\`\`).
-      `;
+        console.error("❌ ERROR: Vercel says GROQ_API_KEY is undefined/empty.");
     } else {
-      systemInstruction = `
-      Write a professional, robust program.
-      Output ONLY the raw code. Do NOT use markdown backticks.
-      `;
+        // Only show the first 4 letters (Safe!)
+        console.log(`✅ Key found! Starts with: ${apiKey.substring(0, 4)}...`);
+        console.log(`📏 Key length: ${apiKey.length} characters`);
+    }
+    console.log("--- DEBUG END ---");
+
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Server Error: Key not found in Vercel Variables' }, { status: 500 });
     }
 
-    // 2. Call Groq API (Using the OpenAI-compatible endpoint)
+    // Prepare Instructions
+    let instruction = simpleMode 
+      ? "CRITICAL: Write SIMPLE, LINEAR code. No loops/menus. Input once. Output ONLY code." 
+      : "Write professional code. Output ONLY code.";
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${apiKey}`, // Key is injected here
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile", // The best free model currently available
+        model: "llama-3.3-70b-versatile",
         messages: [
-          { 
-            role: "system", 
-            content: `You are an expert coding assistant for ${language}. ${systemInstruction}` 
-          },
-          { 
-            role: "user", 
-            content: prompt 
-          }
+          { role: "system", content: `Expert coder in ${language}. ${instruction}` },
+          { role: "user", content: prompt }
         ],
-        temperature: 0.1, // Low temp = precise code
-        max_tokens: 1024
+        temperature: 0.1
       })
     });
 
@@ -58,22 +46,15 @@ export async function POST(request: NextRequest) {
 
     if (data.error) {
       console.error("Groq API Error:", data.error);
-      throw new Error(data.error.message);
+      return NextResponse.json({ error: `Groq Said: ${data.error.message}` }, { status: 500 });
     }
 
-    // 3. Extract and Clean Code
     let generatedCode = data.choices[0].message.content;
-    
-    // Remove markdown if the AI added it anyway
     generatedCode = generatedCode.replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim();
 
-    return NextResponse.json({ 
-      code: generatedCode, 
-      language: language.toLowerCase() 
-    });
+    return NextResponse.json({ code: generatedCode, language: language.toLowerCase() });
 
   } catch (error: any) {
-    console.error("Generation Error:", error);
-    return NextResponse.json({ error: error.message || 'Unknown Error' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
