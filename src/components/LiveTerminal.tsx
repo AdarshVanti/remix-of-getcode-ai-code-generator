@@ -1,73 +1,96 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-// Define the shape of the API response for strict TypeScript safety
-interface PistonResponse {
-  run: {
-    stdout: string;
-    stderr: string;
-    code: number;
-  };
-  message?: string;
-}
-
 interface TerminalProps {
-  generatedCode: string; // The code coming from Gemini
+  generatedCode: string;
+  languageProp?: string; // This gets the language from the main page
 }
 
-export default function LiveTerminal({ generatedCode }: TerminalProps) {
+export default function LiveTerminal({ generatedCode, languageProp }: TerminalProps) {
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("// Output will appear here...");
-  const [stdin, setStdin] = useState(""); // <--- NEW: State for User Input
+  const [stdin, setStdin] = useState("");
   const [language, setLanguage] = useState("python");
   const [isRunning, setIsRunning] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  // Automatically update the terminal when Gemini generates new code
+  // 1. Sync Code: When Gemini creates code, put it in the box
   useEffect(() => {
     if (generatedCode) {
       setCode(generatedCode);
     }
   }, [generatedCode]);
 
-  const runCode = async () => {
-    setIsRunning(true);
-    setOutput("Compiling and running on remote server...");
+  // 2. Sync Language: If you pick "Java" at the top, select "Java" here too
+  useEffect(() => {
+    if (languageProp) {
+      setLanguage(languageProp.toLowerCase());
+    }
+  }, [languageProp]);
 
-    // Map your UI languages to Piston API versions
+  // Helper to run code on Piston
+  const executePiston = async (codeToRun: string, inputToGive: string) => {
+    // Only support C, Java, Python
     const runtimes: Record<string, { language: string; version: string }> = {
       python: { language: "python", version: "3.10.0" },
-      javascript: { language: "javascript", version: "18.15.0" },
       java: { language: "java", version: "15.0.2" },
       c: { language: "c", version: "10.2.0" },
-      cpp: { language: "c++", version: "10.2.0" },
     };
 
-    const runtime = runtimes[language];
+    // Default to python if something is wrong
+    const runtime = runtimes[language] || runtimes["python"];
+
+    const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: runtime.language,
+        version: runtime.version,
+        files: [{ content: codeToRun }],
+        stdin: inputToGive
+      }),
+    });
+    return await response.json();
+  };
+
+  // Feature: Verify Code (Check Syntax)
+  const verifyCode = async () => {
+    setIsVerifying(true);
+    setOutput("Checking syntax...");
+    
+    try {
+      // Run with empty input just to see if it compiles/starts
+      const data = await executePiston(code, "");
+      
+      if (data.run && data.run.stderr) {
+        setOutput(`❌ Error Found:\n${data.run.stderr}`);
+      } else {
+        setOutput("✅ Code looks good! No syntax errors found.\n(Now fill in the input box and click Run Code)");
+      }
+    } catch (err) {
+      setOutput("Could not verify code.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Feature: Run Code
+  const runCode = async () => {
+    setIsRunning(true);
+    setOutput("Compiling and running...");
 
     try {
-      const response = await fetch("https://emkc.org/api/v2/piston/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          language: runtime.language,
-          version: runtime.version,
-          files: [{ content: code }],
-          stdin: stdin // <--- NEW: Sending the input to the server
-        }),
-      });
-
-      const data: PistonResponse = await response.json();
+      const data = await executePiston(code, stdin);
 
       if (data.message) {
-        setOutput(`Error: ${data.message}`);
+        setOutput(`System Error: ${data.message}`);
       } else if (data.run.stderr) {
         setOutput(`⚠️ Execution Error:\n${data.run.stderr}`);
       } else {
         setOutput(`> Output:\n${data.run.stdout}`);
       }
     } catch (error) {
-      setOutput("Error connecting to execution server.");
-      console.error(error);
+      setOutput("Error connecting to server.");
     } finally {
       setIsRunning(false);
     }
@@ -84,8 +107,10 @@ export default function LiveTerminal({ generatedCode }: TerminalProps) {
       color: '#c9d1d9'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: '#58a6ff' }}>💻 Live Execution Terminal</h3>
+        <h3 style={{ margin: 0, color: '#58a6ff' }}>💻 Terminal</h3>
+        
         <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Only C, Java, Python */}
           <select 
             value={language} 
             onChange={(e) => setLanguage(e.target.value)}
@@ -93,81 +118,51 @@ export default function LiveTerminal({ generatedCode }: TerminalProps) {
           >
             <option value="python">Python</option>
             <option value="java">Java</option>
-            <option value="javascript">JavaScript</option>
             <option value="c">C</option>
-            <option value="cpp">C++</option>
           </select>
+
+          {/* Verify Button */}
+          <button 
+            onClick={verifyCode}
+            disabled={isVerifying || isRunning}
+            style={{ padding: '5px 15px', borderRadius: '4px', background: '#1f6feb', color: 'white', border: 'none', cursor: 'pointer' }}
+          >
+            {isVerifying ? 'Checking...' : '✓ Check Syntax'}
+          </button>
+
+          {/* Run Button */}
           <button 
             onClick={runCode} 
-            disabled={isRunning}
-            style={{
-              padding: '5px 15px',
-              borderRadius: '4px',
-              background: isRunning ? '#238636' : '#2ea043',
-              color: 'white',
-              border: 'none',
-              cursor: isRunning ? 'wait' : 'pointer',
-              fontWeight: 'bold'
-            }}
+            disabled={isRunning || isVerifying}
+            style={{ padding: '5px 15px', borderRadius: '4px', background: '#238636', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
           >
             {isRunning ? 'Running...' : '▶ Run Code'}
           </button>
         </div>
       </div>
 
-      {/* Code Editor Area */}
       <textarea 
         value={code} 
         onChange={(e) => setCode(e.target.value)}
         spellCheck={false}
-        placeholder="Source code goes here..."
-        style={{
-          width: '100%',
-          height: '150px',
-          background: '#0d1117',
-          color: '#e6edf3',
-          border: '1px solid #30363d',
-          padding: '10px',
-          borderRadius: '4px',
-          marginBottom: '10px',
-          fontFamily: 'Consolas, "Courier New", monospace'
-        }}
+        style={{ width: '100%', height: '150px', background: '#0d1117', color: '#e6edf3', border: '1px solid #30363d', padding: '10px', borderRadius: '4px', marginBottom: '10px', fontFamily: 'monospace' }}
       />
 
-      {/* NEW: Input Box for User Inputs (stdin) */}
       <div style={{ marginBottom: '10px' }}>
         <label style={{ display: 'block', fontSize: '0.8em', color: '#8b949e', marginBottom: '5px' }}>
-           Program Input (Type numbers here before running):
+           Program Input (Type numbers here):
         </label>
         <textarea 
           value={stdin}
           onChange={(e) => setStdin(e.target.value)}
           placeholder="e.g. 10&#10;20"
-          style={{
-            width: '100%',
-            height: '50px',
-            background: '#161b22',
-            color: '#e6edf3',
-            border: '1px solid #30363d',
-            padding: '10px',
-            borderRadius: '4px',
-            fontFamily: 'monospace',
-            resize: 'vertical'
-          }}
+          style={{ width: '100%', height: '50px', background: '#161b22', color: '#e6edf3', border: '1px solid #30363d', padding: '10px', borderRadius: '4px', fontFamily: 'monospace' }}
         />
       </div>
 
-      {/* Output Display */}
-      <div style={{
-        background: '#010409',
-        padding: '15px',
-        borderRadius: '4px',
-        borderLeft: '4px solid #2ea043',
-        minHeight: '80px',
-        whiteSpace: 'pre-wrap'
-      }}>
+      <div style={{ background: '#010409', padding: '15px', borderRadius: '4px', borderLeft: '4px solid #2ea043', minHeight: '80px', whiteSpace: 'pre-wrap' }}>
         {output}
       </div>
     </div>
   );
-          }
+}
