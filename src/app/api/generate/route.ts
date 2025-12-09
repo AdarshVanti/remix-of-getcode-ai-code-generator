@@ -1,91 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-/**
- * POST /api/generate
- * Generates code based on prompt, language, and complexity mode
- */
 export async function POST(request: NextRequest) {
   try {
+    // 1. Get the inputs (including the Simple Mode switch)
     const { prompt, language, simpleMode } = await request.json();
 
-    // Validate input
-    if (!prompt || !prompt.trim()) {
-      return NextResponse.json(
-        { error: 'Prompt is required' },
-        { status: 400 }
-      );
-    }
+    if (!prompt || !prompt.trim()) return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
 
-    if (!language || !['C', 'Java', 'Python'].includes(language)) {
-      return NextResponse.json(
-        { error: 'Invalid language selection' },
-        { status: 400 }
-      );
-    }
-
-    // Get API key from environment
+    // 2. robust API Key Check (Checks BOTH possible names)
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'API configuration error: Key not found' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Server Error: API Key missing in Vercel Settings' }, { status: 500 });
     }
 
-    // Initialize AI client
     const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // UPDATED: Using "gemini-pro" because it is the most stable version
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    // --- LOGIC FOR SIMPLE VS COMPLEX MODE ---
+    // 3. LOGIC: Simple Mode vs Complex Mode
     let instruction = "";
-    
     if (simpleMode) {
       instruction = `
-      CRITICAL INSTRUCTIONS FOR SIMPLE MODE:
+      CRITICAL INSTRUCTIONS:
       1. Write a SIMPLE, LINEAR program.
-      2. DO NOT use 'while True' loops, infinite menus, or "Try again" prompts.
-      3. DO NOT ask "Do you want to continue?".
-      4. If the program needs input, ask for it ONCE at the start, do the logic, and EXIT immediately.
-      5. Output ONLY the raw code. No markdown formatting.
+      2. NO loops, NO menus, NO "try again".
+      3. Ask for input ONCE at the start.
+      4. Output ONLY raw code.
       `;
     } else {
-      instruction = `
-      Write a professional and robust program.
-      You MAY use loops, menus, and functions if appropriate for the task.
-      Output ONLY the raw code. No markdown formatting.
-      `;
+      instruction = `Write a professional, robust program. You MAY use loops/menus. Output ONLY raw code.`;
     }
 
-    const aiPrompt = `Generate ${language} code for the following request: "${prompt}".
-    
-    ${instruction}
-    
-    Language: ${language}`;
+    const finalPrompt = `Generate ${language} code for: "${prompt}". ${instruction}`;
 
-    // Generate code
-    const result = await model.generateContent(aiPrompt);
-    const response = await result.response;
-    let generatedCode = response.text();
+    // 4. AUTO-FIX: Try 'flash', then 'pro', then '1.0' until one works
+    const modelsToTry = ["gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
+    let generatedCode = "";
+    let lastError = "";
 
-    // Clean up response - remove markdown code blocks if present
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Attempting with model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(finalPrompt);
+        const response = await result.response;
+        generatedCode = response.text();
+        break; // It worked! Stop the loop.
+      } catch (e: any) {
+        console.error(`Model ${modelName} failed:`, e.message);
+        lastError = e.message;
+      }
+    }
+
+    if (!generatedCode) {
+      throw new Error(`All models failed. Last error: ${lastError}`);
+    }
+
+    // 5. Clean up the code (remove markdown)
     generatedCode = generatedCode.replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim();
 
-    return NextResponse.json({
-      code: generatedCode,
-      language: language.toLowerCase(),
-    });
+    return NextResponse.json({ code: generatedCode, language: language.toLowerCase() });
 
   } catch (error: any) {
-    console.error('Code generation error:', error);
-    
-    // Send the specific error message back so we can see it in the browser if it fails
-    return NextResponse.json(
-      { error: `Failed to generate code: ${error.message}` },
-      { status: 500 }
-    );
+    console.error('Final Generation Error:', error);
+    return NextResponse.json({ error: error.message || 'Unknown Error' }, { status: 500 });
   }
 }
